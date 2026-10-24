@@ -181,46 +181,85 @@ export function parseComicDetail(pageHtml: string, base: string, comicPath: stri
 
   // 章节链接：形如 /作品名_N화.html（下划线分隔，区别于短链接的连字符）
   const chapters: ChapterLink[] = [];
+  // 短篇合集章节（副标题+括号编号）单独收集：组内编号不全局唯一，需特殊排序
+  const anthology: Array<{ path: string; subtitle: string; seq: number }> = [];
   const seenHref = new Set<string>();
-  const seenNumber = new Set<number>();
   $("a").each((_, element) => {
     const $a = $(element as never);
     // 站方部分章节链接的 .html 前带空格（如 "_169화 .html"），trim 后再匹配
     const href = String($a.attr("href") ?? "").trim();
-    if (!href.startsWith("/")) {
+    if (!href.startsWith("/") || seenHref.has(href)) {
       return;
     }
-    // 章节链接以「_<序号>」开头，序号后可能是：
-    //   _100화.html / _100화 .html          标准
-    //   _10화_-_친친활용법.html              화 + 副标题
-    //   _71화-7040d5.html                    화 + hash 后缀
-    //   _128화_[19세_완전판].html            화 + 方括号标签
-    //   _001.html                            纯数字（无「화」字）
-    // 排除 _1부_후기.html 这类「部/后记」：没有「화」却带后缀的一律跳过
-    const m = href.match(/^\/(.+?)_(\d+(?:\.\d+)?)(화)?(?:[_-]([\s\S]*?))?\s*\.html$/i);
-    if (!m) {
+    // 章节序号识别（按优先级从右锚定，避免作品名里的数字干扰）：
+    //  1) 「_<序号>화」——序号紧跟「화」字，最可靠（_100화 / _128화_[19세] / _10화_-_친친）
+    //  2) 「_<序号>[.．]<副标题>.html」——数字+点+副标题（_04._도깨비의_왕.html，含全角点）
+    //  3) 「_<序号>.html」结尾——纯数字格式（_001.html）
+    //  4) 「NO.<序号>」——生活记录类（_NO.23_고수의_실력.html）
+    //  5) 「_<副标题>(<编号>).html」——短篇合集（사육일지_SNS_노예_계약(1).html）
+    let numStr = "";
+    const hwaMatches = [...href.matchAll(/_((?:NO\.)?\d+(?:\.\d+)?)화(?![0-9])/gi)];
+    if (hwaMatches.length > 0) {
+      numStr = hwaMatches[hwaMatches.length - 1][1].replace(/^NO\./i, "");
+    } else {
+      const dotted = href.match(/_(\d+(?:\.\d+)?)[.．][\s\S]*\.html$/i);
+      if (dotted) {
+        numStr = dotted[1];
+      } else {
+        const bare = href.match(/_(\d+(?:\.\d+)?)\s*\.html$/i);
+        if (bare) {
+          numStr = bare[1];
+        } else {
+          const noMatch = href.match(/NO\.(\d+(?:\.\d+)?)/i);
+          if (noMatch) {
+            numStr = noMatch[1];
+          }
+        }
+      }
+    }
+    if (numStr) {
+      seenHref.add(href);
+      chapters.push({ path: href, name: `${numStr}화`, number: parseFloat(numStr) });
       return;
     }
-    if (!m[3] && m[4]) {
-      return; // 如「_1부_후기」：数字后无「화」但有后缀 → 不是章节
+    // 短篇合集：副标题 + 括号编号（编号仅在同一副标题内唯一，不能按编号去重）
+    // 例：/사육일지_SNS_노예_계약(1).html → 名「SNS 노예 계약 (1)」
+    const m2 = href.match(/^\/(.+?)_(.+?)\s*\((\d+)\)\s*\.html$/i);
+    if (m2) {
+      const subtitle = cleanText(m2[2]);
+      // 副标题不能是纯数字（那是别的格式），也不能为空
+      if (subtitle && !/^\d+$/.test(subtitle)) {
+        seenHref.add(href);
+        anthology.push({ path: href, subtitle, seq: parseInt(m2[3], 10) });
+      }
     }
-    if (seenHref.has(href)) {
-      return;
-    }
-    // 同一章节号可能对应多个链接（普通版 / 19세完全版 / 带 hash 版），按序号去重保留首个
-    const number = parseFloat(m[2]);
-    if (seenNumber.has(number)) {
-      return;
-    }
-    seenHref.add(href);
-    seenNumber.add(number);
-    chapters.push({ path: href, name: `${m[2]}화`, number });
   });
 
-  // 按序号升序（第 1 话在前）
-  chapters.sort((a, b) => a.number - b.number);
+  // 合集排序：站点把最新组放最前，阅读顺序应为「组倒序 + 组内编号升序」
+  if (anthology.length > 0) {
+    const groups: string[] = [];
+    for (const item of anthology) {
+      if (!groups.includes(item.subtitle)) {
+        groups.push(item.subtitle);
+      }
+    }
+    for (const item of anthology) {
+      const groupOrder = groups.indexOf(item.subtitle);
+      chapters.push({
+        path: item.path,
+        name: `${item.subtitle} (${item.seq})`,
+        number: (groups.length - groupOrder) * 1000 + item.seq,
+      });
+    }
+  }
 
-  return { title, author, description, coverUrl, chapters, totalChapters };
+  // 按序号升序（第 1 话在前）；序号相同（多季/重制版）按页面出现顺序稳定排列
+  const sorted = chapters
+    .map((chapter, index) => ({ chapter, index }))
+    .sort((a, b) => a.chapter.number - b.chapter.number || a.index - b.index)
+    .map((entry) => entry.chapter);
+
+  return { title, author, description, coverUrl, chapters: sorted, totalChapters };
 }
 
 /**
