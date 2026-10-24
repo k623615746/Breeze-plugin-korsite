@@ -31,6 +31,25 @@ import { refreshOrigins } from "./site";
 import { defaultSites, getOrigin, getSiteById } from "./sites";
 import { getTranslateEmail, setTranslateEmail, translateToKorean } from "./translate";
 import { buildPluginInfo } from "./get-info";
+import {
+  applyTranslateSettings,
+  isDisplayTranslateEnabled,
+  translateChapterNames,
+  translateListTitles,
+  translateToChinese,
+} from "./translate-display";
+
+/** 设置里开了「显示翻译」才生效：把韩文列表标题批量译成中文 */
+async function maybeTranslateTitles<T extends { title: string }>(items: T[]): Promise<T[]> {
+  if (!(await isDisplayTranslateEnabled())) {
+    return items;
+  }
+  try {
+    return await translateListTitles(items);
+  } catch {
+    return items;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // 配置
@@ -126,7 +145,7 @@ async function searchComic(payload: SearchComicPayload): Promise<SearchResultCon
   const pageHtml = await fetchSitePath(siteId, searchPath);
 
   const hits = parseSearchResults(pageHtml, origin);
-  const items = hits.map((hit) =>
+  const rawItems = hits.map((hit) =>
     toComicListItem({
       id: `${siteId}:${hit.path}`,
       title: hit.title,
@@ -134,6 +153,7 @@ async function searchComic(payload: SearchComicPayload): Promise<SearchResultCon
       raw: { siteId, path: hit.path },
     }),
   );
+  const items = await maybeTranslateTitles(rawItems);
 
   const total = items.length;
   const paging = { page: 1, pages: 1, total, hasReachedMax: true };
@@ -164,7 +184,7 @@ async function getRankingData(payload: SearchComicPayload): Promise<ComicPagedLi
 
   // 列表页也是静态作品短链接
   const hits = parseSearchResults(pageHtml, origin);
-  const items = hits.map((hit) =>
+  const rawItems = hits.map((hit) =>
     toComicListItem({
       id: `${siteId}:${hit.path}`,
       title: hit.title,
@@ -172,6 +192,7 @@ async function getRankingData(payload: SearchComicPayload): Promise<ComicPagedLi
       raw: { siteId, path: hit.path },
     }),
   );
+  const items = await maybeTranslateTitles(rawItems);
 
   return {
     source: PLUGIN_ID,
@@ -255,6 +276,35 @@ async function getComicDetail(payload: ComicDetailPayload): Promise<ComicDetailC
     extern: { siteId, path: chapter.path },
   }));
 
+  // 可选：标题/简介/章节名译成中文（设置里开启后生效）
+  let displayTitle = detail.title || cleanText(path.replace(/^\//, ""));
+  let displayDescription = detail.description || "";
+  if (await isDisplayTranslateEnabled()) {
+    try {
+      const [titleZh, descZh, nameMap] = await Promise.all([
+        translateToChinese(displayTitle),
+        translateToChinese(displayDescription),
+        translateChapterNames(chapters.map((chapter) => chapter.name)),
+      ]);
+      if (titleZh && titleZh !== displayTitle) {
+        displayTitle = `${titleZh}（${displayTitle}）`;
+      }
+      if (descZh) {
+        displayDescription = descZh;
+      }
+      if (nameMap.size > 0) {
+        for (const chapter of chapters) {
+          const translated = nameMap.get(chapter.name);
+          if (translated) {
+            chapter.name = translated;
+          }
+        }
+      }
+    } catch {
+      // 翻译失败保留原文
+    }
+  }
+
   return {
     source: PLUGIN_ID,
     comicId,
@@ -264,7 +314,7 @@ async function getComicDetail(payload: ComicDetailPayload): Promise<ComicDetailC
       normal: {
         comicInfo: {
           id: comicId,
-          title: detail.title || cleanText(path.replace(/^\//, "")),
+          title: displayTitle,
           titleMeta: [],
           creator: {
             id: "",
@@ -273,7 +323,7 @@ async function getComicDetail(payload: ComicDetailPayload): Promise<ComicDetailC
             onTap: null,
             extern: {},
           },
-          description: detail.description || "",
+          description: displayDescription,
           cover: createImage({
             id: comicId,
             url: detail.coverUrl,
@@ -451,8 +501,13 @@ async function getSettingsBundle(): Promise<SettingsBundleContract> {
       sections: [
         {
           id: "translate",
-          title: "中文检索翻译",
+          title: "翻译",
           fields: [
+            {
+              key: "translate.display",
+              kind: "switch",
+              label: "把韩文标题/简介翻译成中文显示（免费翻译接口，速度较慢且有配额）",
+            },
             {
               key: KEY_TRANSLATE_EMAIL,
               kind: "text",
@@ -480,6 +535,7 @@ async function getSettingsBundle(): Promise<SettingsBundleContract> {
       values: {
         [KEY_TRANSLATE_EMAIL]: email,
         [KEY_DEFAULT_SITE]: defaultSite,
+        "translate.display": (await isDisplayTranslateEnabled()) ? "true" : "false",
       },
     },
   };
@@ -491,6 +547,8 @@ async function onSettingChanged(payload?: Record<string, unknown>) {
   const value = typeof raw === "boolean" ? (raw ? "true" : "false") : pickString(raw);
   if (key) {
     await writeSetting(key, value);
+    // 同步翻译模块内存态（显示翻译 + 搜索输入翻译的邮箱）
+    applyTranslateSettings({ [key]: value });
     if (key === KEY_TRANSLATE_EMAIL) {
       setTranslateEmail(value);
     }
