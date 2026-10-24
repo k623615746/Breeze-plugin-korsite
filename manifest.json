@@ -1,0 +1,101 @@
+{
+  "name": "코사이트",
+  "uuid": "7d1e0b4f-9c2a-4e8f-a3b6-5f2d8c1e9a47",
+  "iconUrl": "https://cdn.jsdelivr.net/gh/k623615746/Breeze-plugin-korsite@main/assets/icon.png",
+  "describe": "韩漫聚合源，整合 툰코(toonkor)、펀비(funbe)、뉴토끼(newtoki) 等多个韩国漫画站。\n\n- 域名自动跟随 korsite.net 发布页更新，失效自动切换\n- **支持中文检索**：中文关键词自动翻译成韩文再搜索\n- 网页漫画 / 日漫 / 小说 分类浏览\n- 图片走各站 CDN，无需登录即可阅读\n\n> 站点内容多为未经授权的搬运 / 汉化作品，版权归原作者及出版方所有，请自行判断使用合规性，建议支持正版。",
+  "version": "1.0.0",
+  "home": "https://github.com/k623615746/Breeze-plugin-korsite",
+  "updateUrl": "https://api.github.com/repos/k623615746/Breeze-plugin-korsite/releases/latest",
+  "function": [
+    {
+      "id": "webtoon",
+      "title": "网页漫画",
+      "action": {
+        "type": "openComicList",
+        "payload": {
+          "scene": {
+            "title": "网页漫画",
+            "source": "7d1e0b4f-9c2a-4e8f-a3b6-5f2d8c1e9a47",
+            "body": {
+              "type": "pluginPagedComicList",
+              "request": {
+                "fnPath": "getRankingData",
+                "core": {
+                  "board": "wtoon"
+                },
+                "extern": {}
+              }
+            },
+            "filter": {
+              "fnPath": "getRankingFilterBundle",
+              "core": {
+                "board": "wtoon"
+              },
+              "extern": {}
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "manga",
+      "title": "日漫",
+      "action": {
+        "type": "openComicList",
+        "payload": {
+          "scene": {
+            "title": "日漫",
+            "source": "7d1e0b4f-9c2a-4e8f-a3b6-5f2d8c1e9a47",
+            "body": {
+              "type": "pluginPagedComicList",
+              "request": {
+                "fnPath": "getRankingData",
+                "core": {
+                  "board": "manga"
+                },
+                "extern": {}
+              }
+            },
+            "filter": {
+              "fnPath": "getRankingFilterBundle",
+              "core": {
+                "board": "manga"
+              },
+              "extern": {}
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "novel",
+      "title": "小说",
+      "action": {
+        "type": "openComicList",
+        "payload": {
+          "scene": {
+            "title": "小说",
+            "source": "7d1e0b4f-9c2a-4e8f-a3b6-5f2d8c1e9a47",
+            "body": {
+              "type": "pluginPagedComicList",
+              "request": {
+                "fnPath": "getRankingData",
+                "core": {
+                  "board": "novel"
+                },
+                "extern": {}
+              }
+            },
+            "filter": {
+              "fnPath": "getRankingFilterBundle",
+              "core": {
+                "board": "novel"
+              },
+              "extern": {}
+            }
+          }
+        }
+      }
+    }
+  ]
+}
