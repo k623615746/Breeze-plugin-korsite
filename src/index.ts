@@ -23,6 +23,7 @@ import {
   containsHangul,
   createImage,
   createMetadata,
+  safePathSegment,
   toComicListItem,
 } from "./common";
 import { fetchImage, fetchSitePath, siteAbsoluteUrl } from "./http";
@@ -278,33 +279,31 @@ async function getComicDetail(payload: ComicDetailPayload): Promise<ComicDetailC
     extern: { siteId, path: chapter.path },
   }));
 
-  // 可选：标题/简介/章节名译成中文（设置里开启后生效）
+  // 详情页翻译始终开启：标题/简介/章节名自动译成中文（列表标题翻译由设置开关控制）
   let displayTitle = detail.title || cleanText(path.replace(/^\//, ""));
   let displayDescription = detail.description || "";
-  if (await isDisplayTranslateEnabled()) {
-    try {
-      const [titleZh, descZh, nameMap] = await Promise.all([
-        translateToChinese(displayTitle),
-        translateToChinese(displayDescription),
-        translateChapterNames(chapters.map((chapter) => chapter.name)),
-      ]);
-      if (titleZh && titleZh !== displayTitle) {
-        displayTitle = `${titleZh}（${displayTitle}）`;
-      }
-      if (descZh) {
-        displayDescription = descZh;
-      }
-      if (nameMap.size > 0) {
-        for (const chapter of chapters) {
-          const translated = nameMap.get(chapter.name);
-          if (translated) {
-            chapter.name = translated;
-          }
+  try {
+    const [titleZh, descZh, nameMap] = await Promise.all([
+      translateToChinese(displayTitle),
+      translateToChinese(displayDescription),
+      translateChapterNames(chapters.map((chapter) => chapter.name)),
+    ]);
+    if (titleZh && titleZh !== displayTitle) {
+      displayTitle = `${titleZh}（${displayTitle}）`;
+    }
+    if (descZh) {
+      displayDescription = descZh;
+    }
+    if (nameMap.size > 0) {
+      for (const chapter of chapters) {
+        const translated = nameMap.get(chapter.name);
+        if (translated) {
+          chapter.name = translated;
         }
       }
-    } catch {
-      // 翻译失败保留原文
     }
+  } catch {
+    // 翻译失败保留原文
   }
 
   return {
@@ -330,7 +329,7 @@ async function getComicDetail(payload: ComicDetailPayload): Promise<ComicDetailC
             id: comicId,
             url: detail.coverUrl,
             name: detail.title,
-            path: `comic/${comicId}/cover.jpg`,
+            path: `comic/${safePathSegment(comicId)}/cover.jpg`,
             extern: {},
           }),
           metadata: [
@@ -412,7 +411,7 @@ async function buildChapterData(comicId: string, chapterId: string) {
     return {
       id: `${chapterId}-${pageNo}`,
       name: `page-${index + 1}`,
-      path: `comic/${comicId}/${chapterId}/${pageNo}.jpg`,
+      path: `comic/${safePathSegment(comicId)}/${safePathSegment(chapterId)}/${pageNo}.jpg`,
       url: url.startsWith("http") ? url : absoluteUrlFallback(url, origin),
       extern: { index: index + 1 },
     };
@@ -513,7 +512,7 @@ async function getSettingsBundle(): Promise<SettingsBundleContract> {
             {
               key: "translate.display",
               kind: "switch",
-              label: "把韩文标题/简介翻译成中文显示（免费翻译接口，速度较慢且有配额）",
+              label: "列表标题也翻译成中文（详情页的标题/简介/章节名始终自动翻译）",
             },
             {
               key: KEY_TRANSLATE_EMAIL,

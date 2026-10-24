@@ -118,6 +118,11 @@ export function containsCjk(input: string): boolean {
   return /[\u4e00-\u9fff]/.test(input);
 }
 
+/** 把 id（含 : / 韩文等非法文件名字符）净化成宿主可安全用作缓存路径的形式 */
+export function safePathSegment(id: string): string {
+  return encodeURIComponent(String(id || ""));
+}
+
 /** 构建列表条目（统一入口） */
 export function toComicListItem(input: {
   id: string;
@@ -144,7 +149,7 @@ export function toComicListItem(input: {
       id: input.id,
       url: cover,
       name: title,
-      path: `comic/${input.id}/cover.jpg`,
+      path: `comic/${safePathSegment(input.id)}/cover.jpg`,
       extern: {},
     }),
     metadata: [],
