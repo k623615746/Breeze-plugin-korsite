@@ -59,7 +59,7 @@ export function buildPluginInfo(): InfoContract {
       "",
       "> 站点内容多为未经授权的搬运 / 汉化作品，版权归原作者及出版方所有，请自行判断使用合规性，建议支持正版。",
     ].join("\n"),
-    version: "1.2.1",
+    version: "1.2.2",
     home: `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`,
     updateUrl: UPDATE_URL,
     function: buildFunctions(),

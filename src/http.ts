@@ -74,11 +74,20 @@ function encodePath(path: string): string {
 /** 单次站内请求；失败返回 null 而不抛错，交给上层决定是否换域名 */
 async function trySiteFetch(url: string, timeoutMs: number): Promise<string | null> {
   try {
-    const res = await fetch(url, {
+    let res = await fetch(url, {
       headers: buildHeaders(url),
       redirect: "follow",
       signal: AbortSignal.timeout(timeoutMs),
     });
+    // CDN/WAF 偶发 403/503 抖动：等 2 秒重试一次再判失败
+    if (res.status === 403 || res.status === 503) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 2000));
+      res = await fetch(url, {
+        headers: buildHeaders(url),
+        redirect: "follow",
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    }
     if (!res.ok) {
       console.log("[korsite] 请求失败:", res.status, url);
       return null;
