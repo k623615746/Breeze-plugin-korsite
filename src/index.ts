@@ -417,7 +417,8 @@ async function buildChapterData(comicId: string, chapterId: string) {
     };
   });
 
-  const chapterName = chapterPath.match(/(\d+)화\.html$/)?.[1] ?? "章节";
+  // 章节页 URL 可能是带空格的 "_169화 .html"，正则兼容空白与小数话
+  const chapterName = chapterPath.match(/(\d+(?:\.\d+)?)화\s*\.html$/i)?.[1] ?? "章节";
   const current = chapters.find((item) => item.requestId === chapterId) ?? {
     id: chapterId,
     requestId: chapterId,

@@ -81,8 +81,11 @@ check("章节列表非空且有序", () => {
   const numbers = detail.chapters.map((c) => c.number);
   assert.deepEqual(numbers, [...numbers].sort((a, b) => a - b), "章节应按序号升序");
 });
-check("章节路径形如 /作品_N화.html", () => {
-  assert.ok(detail.chapters.every((c) => /\/.+_\d+화\.html$/.test(c.path)));
+check("章节路径形如 /作品_N화.html（兼容 .html 前空格）", () => {
+  assert.ok(
+    detail.chapters.every((c) => /\/.+_\d+(?:\.\d+)?화\s*\.html$/i.test(c.path)),
+    detail.chapters.map((c) => c.path).slice(0, 3).join(","),
+  );
 });
 
 console.log("\n[3] 章节页图片提取");

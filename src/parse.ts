@@ -184,11 +184,14 @@ export function parseComicDetail(pageHtml: string, base: string, comicPath: stri
   const seen = new Set<string>();
   $("a").each((_, element) => {
     const $a = $(element as never);
+    // 站方部分章节链接的 .html 前带空格（如 "_169화 .html"），trim 后再匹配
     const href = String($a.attr("href") ?? "").trim();
     if (!href.startsWith("/")) {
       return;
     }
-    const m = href.match(/^\/(.+?)_(\d+)화\.html$/);
+    // 章节链接形如 /作品名_N화.html（下划线分隔，区别于短链接的连字符）；
+    // 兼容「화」与「.html」之间的空白，也兼容「1.5화」小数话
+    const m = href.match(/^\/(.+?)_(\d+(?:\.\d+)?)화\s*\.html$/i);
     if (!m) {
       return;
     }
@@ -196,8 +199,8 @@ export function parseComicDetail(pageHtml: string, base: string, comicPath: stri
       return;
     }
     seen.add(href);
-    const number = parseInt(m[2], 10);
-    chapters.push({ path: href, name: `${number}화`, number });
+    const number = parseFloat(m[2]);
+    chapters.push({ path: href, name: `${m[2]}화`, number });
   });
 
   // 按序号升序（第 1 话在前）
