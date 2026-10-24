@@ -81,11 +81,15 @@ check("章节列表非空且有序", () => {
   const numbers = detail.chapters.map((c) => c.number);
   assert.deepEqual(numbers, [...numbers].sort((a, b) => a - b), "章节应按序号升序");
 });
-check("章节路径形如 /作品_N화.html（兼容 .html 前空格）", () => {
+check("章节路径形如 /作品_N화.html（兼容空格/副标题/hash/纯数字）", () => {
   assert.ok(
-    detail.chapters.every((c) => /\/.+_\d+(?:\.\d+)?화\s*\.html$/i.test(c.path)),
+    detail.chapters.every((c) =>
+      /^\/(.+?)_\d+(?:\.\d+)?(?:화)?(?:\s*[_-][\s\S]*?)?\s*\.html$/i.test(c.path),
+    ),
     detail.chapters.map((c) => c.path).slice(0, 3).join(","),
   );
+  // 不应把「_1부_후기」这类后记当章节
+  assert.ok(detail.chapters.every((c) => !/부\s*\.html$/i.test(c.path)));
 });
 
 console.log("\n[3] 章节页图片提取");

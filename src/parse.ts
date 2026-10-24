@@ -181,7 +181,8 @@ export function parseComicDetail(pageHtml: string, base: string, comicPath: stri
 
   // 章节链接：形如 /作品名_N화.html（下划线分隔，区别于短链接的连字符）
   const chapters: ChapterLink[] = [];
-  const seen = new Set<string>();
+  const seenHref = new Set<string>();
+  const seenNumber = new Set<number>();
   $("a").each((_, element) => {
     const $a = $(element as never);
     // 站方部分章节链接的 .html 前带空格（如 "_169화 .html"），trim 后再匹配
@@ -189,17 +190,30 @@ export function parseComicDetail(pageHtml: string, base: string, comicPath: stri
     if (!href.startsWith("/")) {
       return;
     }
-    // 章节链接形如 /作品名_N화.html（下划线分隔，区别于短链接的连字符）；
-    // 兼容「화」与「.html」之间的空白，也兼容「1.5화」小数话
-    const m = href.match(/^\/(.+?)_(\d+(?:\.\d+)?)화\s*\.html$/i);
+    // 章节链接以「_<序号>」开头，序号后可能是：
+    //   _100화.html / _100화 .html          标准
+    //   _10화_-_친친활용법.html              화 + 副标题
+    //   _71화-7040d5.html                    화 + hash 后缀
+    //   _128화_[19세_완전판].html            화 + 方括号标签
+    //   _001.html                            纯数字（无「화」字）
+    // 排除 _1부_후기.html 这类「部/后记」：没有「화」却带后缀的一律跳过
+    const m = href.match(/^\/(.+?)_(\d+(?:\.\d+)?)(화)?(?:[_-]([\s\S]*?))?\s*\.html$/i);
     if (!m) {
       return;
     }
-    if (seen.has(href)) {
+    if (!m[3] && m[4]) {
+      return; // 如「_1부_후기」：数字后无「화」但有后缀 → 不是章节
+    }
+    if (seenHref.has(href)) {
       return;
     }
-    seen.add(href);
+    // 同一章节号可能对应多个链接（普通版 / 19세完全版 / 带 hash 版），按序号去重保留首个
     const number = parseFloat(m[2]);
+    if (seenNumber.has(number)) {
+      return;
+    }
+    seenHref.add(href);
+    seenNumber.add(number);
     chapters.push({ path: href, name: `${m[2]}화`, number });
   });
 

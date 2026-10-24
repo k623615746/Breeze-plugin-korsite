@@ -1,6 +1,6 @@
 {
   "name": "breeze-plugin-korsite",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "type": "module",
   "description": "Breeze 插件：코사이트 韩漫聚合源（toonkor/funbe 等多站 + 中文检索）",
   "files": [

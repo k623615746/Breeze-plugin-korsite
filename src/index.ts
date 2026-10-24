@@ -338,7 +338,16 @@ async function getComicDetail(payload: ComicDetailPayload): Promise<ComicDetailC
             createMetadata(
               "info",
               "信息",
-              [detail.totalChapters > 0 ? `共 ${detail.totalChapters} 话` : ""].filter(Boolean),
+              [
+                // 目录实际解析出的章节数（与章节目录一致）；
+                // 站点标注总数更大时附注，避免「信息与目录对不上」的困惑
+                chapters.length > 0
+                  ? `共 ${chapters.length} 话` +
+                    (detail.totalChapters > chapters.length ? `（站点标注 ${detail.totalChapters} 话）` : "")
+                  : detail.totalChapters > 0
+                    ? `站点共 ${detail.totalChapters} 话`
+                    : "",
+              ].filter(Boolean),
             ),
           ],
           extern: { siteId, path },
@@ -417,8 +426,8 @@ async function buildChapterData(comicId: string, chapterId: string) {
     };
   });
 
-  // 章节页 URL 可能是带空格的 "_169화 .html"，正则兼容空白与小数话
-  const chapterName = chapterPath.match(/(\d+(?:\.\d+)?)화\s*\.html$/i)?.[1] ?? "章节";
+  // 章节页 URL 可能是 "_169화 .html" / "_001.html" / "_71화-abc.html"，宽松匹配
+  const chapterName = chapterPath.match(/_(\d+(?:\.\d+)?)(?:화)?\s*(?:[_-][\s\S]*?)?\.html$/i)?.[1] ?? "章节";
   const current = chapters.find((item) => item.requestId === chapterId) ?? {
     id: chapterId,
     requestId: chapterId,
