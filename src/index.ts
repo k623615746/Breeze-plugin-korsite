@@ -336,6 +336,11 @@ async function getComicDetail(payload: ComicDetailPayload): Promise<ComicDetailC
           metadata: [
             createMetadata("author", "作者", detail.author ? [detail.author] : []),
             createMetadata("source", "来源站", [site.nameZh]),
+            createMetadata(
+              "info",
+              "信息",
+              [detail.totalChapters > 0 ? `共 ${detail.totalChapters} 话` : ""].filter(Boolean),
+            ),
           ],
           extern: { siteId, path },
         },

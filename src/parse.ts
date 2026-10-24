@@ -36,6 +36,8 @@ export type ComicDetail = {
   description: string;
   coverUrl: string;
   chapters: ChapterLink[];
+  /** 总话数（从「총 N화」提取），无则 0 */
+  totalChapters: number;
 };
 
 export type ChapterLink = {
@@ -170,6 +172,13 @@ export function parseComicDetail(pageHtml: string, base: string, comicPath: stri
     author = authorMatch[1];
   }
 
+  // 总话数：从「총 N화」或「총편수 총 N화」提取
+  let totalChapters = 0;
+  const totalMatch = description.match(/총\s*(?:편수\s*)?(\d+)\s*화/);
+  if (totalMatch) {
+    totalChapters = parseInt(totalMatch[1], 10);
+  }
+
   // 章节链接：形如 /作品名_N화.html（下划线分隔，区别于短链接的连字符）
   const chapters: ChapterLink[] = [];
   const seen = new Set<string>();
@@ -194,7 +203,7 @@ export function parseComicDetail(pageHtml: string, base: string, comicPath: stri
   // 按序号升序（第 1 话在前）
   chapters.sort((a, b) => a.number - b.number);
 
-  return { title, author, description, coverUrl, chapters };
+  return { title, author, description, coverUrl, chapters, totalChapters };
 }
 
 /**
