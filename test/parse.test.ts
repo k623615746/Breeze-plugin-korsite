@@ -57,6 +57,18 @@ check("列表页排除导航链接", () => {
   const nav = ["/TV", "/단행본", "/망가", "/소설", "/애니", "/웹툰", "/notice"];
   assert.ok(listHits.every((h) => !nav.includes(h.path)));
 });
+check("列表页封面取自 data-src（非小狗占位图）", () => {
+  const withCover = listHits.filter((h) => h.coverUrl);
+  assert.ok(withCover.length > 0, "列表页没有解析出任何封面");
+  assert.ok(
+    withCover.every((h) => h.coverUrl.includes("/data/wtoon/") && /thumb-.*\.(jpg|jpeg|png|webp)$/i.test(h.coverUrl)),
+    `封面不是作品缩略图: ${withCover[0]?.coverUrl}`,
+  );
+});
+check("列表页每个作品都有封面", () => {
+  const missing = listHits.filter((h) => !h.coverUrl);
+  assert.equal(missing.length, 0, `有 ${missing.length} 个作品缺封面: ${missing.map((h) => h.title).join(",")}`);
+});
 
 console.log("\n[2] 详情页解析");
 const detail = parseComicDetail(fixture("detail.html"), "https://toonkor6.org", "/S급-나무로-레벨업");

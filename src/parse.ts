@@ -12,6 +12,7 @@ import { absoluteUrl, cleanText } from "./common";
 type Selection = {
   attr: (name: string) => string | undefined;
   text: () => string;
+  find: (selector: string) => Selection;
   each: (fn: (index: number, element: unknown) => void) => void;
 };
 
@@ -25,6 +26,8 @@ export type SearchHit = {
   /** 作品短链接路径，如 /S급-나무로-레벨업 */
   path: string;
   title: string;
+  /** 封面图（列表卡片的 data-src），可能为空 */
+  coverUrl: string;
 };
 
 export type ComicDetail = {
@@ -69,46 +72,76 @@ const NAV_PATHS = new Set([
   "/장르",
 ]);
 
-/** 从搜索页 HTML 提取作品链接列表 */
+/** 从搜索页/列表页 HTML 提取作品列表（含封面） */
 export function parseSearchResults(pageHtml: string, base: string): SearchHit[] {
   const $ = html().load(pageHtml);
   const hits: SearchHit[] = [];
   const seen = new Set<string>();
 
-  $("a").each((_, element) => {
-    const $a = $(element as never);
+  // 列表卡片结构：.section-item-inner 里 .section-item-photo 的 <img data-src> 是封面，
+  // .section-item-title 里的 <a href> 是作品链接。先按容器建立 封面 与 链接 的对应关系。
+  // 兜底：也支持「先遍历 a 提取链接，再全局找 img」的旧逻辑。
+
+  // 1) 建立 data-src 封面表（按 alt 标题 + 顺序）
+  $(".section-item-inner").each((_, element) => {
+    const $item = $(element as never);
+    // 标题链接在 .section-item-title 里，避免把「더 읽기」等按钮文字混进标题
+    const $a = $item.find(".section-item-title a");
     const href = String($a.attr("href") ?? "").trim();
-    if (!href.startsWith("/")) {
-      return; // 只处理站内短链接
-    }
-    if (NAV_PATHS.has(href)) {
+    const $img = $item.find("img");
+    const dataSrc = String($img.attr("data-src") ?? "").trim();
+    const src = String($img.attr("src") ?? "").trim();
+    const coverRaw = dataSrc || (src && !src.startsWith("data:image") ? src : "");
+    const title = cleanText($a.text() || $img.attr("alt"));
+
+    if (!href.startsWith("/") || NAV_PATHS.has(href)) {
       return;
     }
-    // 作品短链接形如 /한글-제목，不含查询串、不含文件扩展
-    if (/\.(php|html?|css|js|png|jpe?g|gif|webp)$/i.test(href)) {
+    if (/\.(php|html?|css|js|png|jpe?g|gif|webp)$/i.test(href) || href.includes("?")) {
       return;
     }
-    if (href.includes("?")) {
-      return;
-    }
-    const title = cleanText($a.text());
-    if (!title) {
-      return;
-    }
-    // 「더 읽기」(更多) 是重复链接，跳过
-    if (title === "더 읽기" || title === "더보기") {
-      return;
-    }
-    // 过滤明显的非作品链接（含斜杠子路径的、纯图标）
     if (href.split("/").filter(Boolean).length > 1) {
+      return;
+    }
+    if (!title || title === "더 읽기" || title === "더보기") {
       return;
     }
     if (seen.has(href)) {
       return;
     }
     seen.add(href);
-    hits.push({ path: href, title });
+    hits.push({
+      path: href,
+      title,
+      coverUrl: coverRaw ? absoluteUrl(coverRaw, base) : "",
+    });
   });
+
+  // 2) 若上面没解析到卡片（比如列表结构不同），退回纯链接遍历
+  if (hits.length === 0) {
+    $("a").each((_, element) => {
+      const $a = $(element as never);
+      const href = String($a.attr("href") ?? "").trim();
+      if (!href.startsWith("/") || NAV_PATHS.has(href)) {
+        return;
+      }
+      if (/\.(php|html?|css|js|png|jpe?g|gif|webp)$/i.test(href) || href.includes("?")) {
+        return;
+      }
+      const title = cleanText($a.text());
+      if (!title || title === "더 읽기" || title === "더보기") {
+        return;
+      }
+      if (href.split("/").filter(Boolean).length > 1) {
+        return;
+      }
+      if (seen.has(href)) {
+        return;
+      }
+      seen.add(href);
+      hits.push({ path: href, title, coverUrl: "" });
+    });
+  }
 
   return hits;
 }

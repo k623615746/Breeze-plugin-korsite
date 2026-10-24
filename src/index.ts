@@ -150,6 +150,7 @@ async function searchComic(payload: SearchComicPayload): Promise<SearchResultCon
       id: `${siteId}:${hit.path}`,
       title: hit.title,
       subtitle: getSiteById(siteId)?.nameZh ?? siteId,
+      coverUrl: hit.coverUrl,
       raw: { siteId, path: hit.path },
     }),
   );
@@ -189,6 +190,7 @@ async function getRankingData(payload: SearchComicPayload): Promise<ComicPagedLi
       id: `${siteId}:${hit.path}`,
       title: hit.title,
       subtitle: getSiteById(siteId)?.nameZh ?? siteId,
+      coverUrl: hit.coverUrl,
       raw: { siteId, path: hit.path },
     }),
   );
